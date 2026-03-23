@@ -18,15 +18,15 @@
 <body>
 
 <div class="container">
-    <h2>📸 FUJIFILM底片風格濾波器</h2>
-    <p>上傳圖片，套用帶有底片色彩與顆粒的平滑濾波器</p>
+    <h2>📸 復古光暈濾波器</h2>
+    <p>上傳圖片，套用帶有FUJI FILM底片風格的平滑濾波器</p>
     
     <input type="file" id="upload" accept="image/*">
     
     <div class="btn-group">
-        <button id="btn3x3" disabled>3x3 輕微修飾</button>
+        <button id="btn3x3" disabled>3x3 微修飾</button>
         <button id="btn5x5" disabled>5x5 柔焦感</button>
-        <button id="btn9x9" disabled>9x9 夢幻氛圍</button>
+        <button id="btn9x9" disabled>9x9 夢境氛圍</button>
         <button id="btnReset" disabled>還原原圖</button>
     </div>
 
@@ -44,31 +44,47 @@
     
     let originalImageData = null;
 
-    // 將二維矩陣轉為一維陣列供 JS 運算，這裡使用你提供的高斯平滑數值
+    // ==========================================
+    // 自定義濾波器：老鏡頭光暈 (Vintage Halation)
+    // ==========================================
+    
+    // 輔助函數：自動將我們自訂的矩陣正規化 (讓總和等於 1，確保圖片亮度不變)
+    function normalizeKernel(kernel) {
+        const sum = kernel.reduce((a, b) => a + b, 0);
+        return kernel.map(weight => weight / sum);
+    }
+
     const kernels = {
-        '3x3': [
-            1/16, 2/16, 1/16,
-            2/16, 4/16, 2/16,
-            1/16, 2/16, 1/16
-        ],
-        '5x5': [
-            1/256, 4/256, 6/256, 4/256, 1/256,
-            4/256, 16/256, 24/256, 16/256, 4/256,
-            6/256, 24/256, 36/256, 24/256, 6/256,
-            4/256, 16/256, 24/256, 16/256, 4/256,
-            1/256, 4/256, 6/256, 4/256, 1/256
-        ],
-        '9x9': [
-            1, 4, 10, 16, 19, 16, 10, 4, 1,
-            4, 16, 36, 64, 76, 64, 36, 16, 4,
-            10, 36, 81, 144, 171, 144, 81, 36, 10,
-            16, 64, 144, 256, 304, 256, 144, 64, 16,
-            19, 76, 171, 304, 361, 304, 171, 76, 19,
-            16, 64, 144, 256, 304, 256, 144, 64, 16,
-            10, 36, 81, 144, 171, 144, 81, 36, 10,
-            4, 16, 36, 64, 76, 64, 36, 16, 4,
-            1, 4, 10, 16, 19, 16, 10, 4, 1
-        ].map(x => x / 4096)
+        // 自定義 3x3：微光暈濾波器 (保留極大中心細節，微小邊緣散射)
+        '3x3': normalizeKernel([
+            1, 2, 1,
+            2, 12, 2,  // 中心點給予 12 的高權重 (傳統高斯只有 4)
+            1, 2, 1
+        ]),
+
+        // 自定義 5x5：黑柔焦鏡 (Black Pro-Mist)
+        // 模擬攝影常見的柔光鏡，中心極端銳利，但外圍帶有均勻的微光
+        '5x5': normalizeKernel([
+            1, 1, 2, 1, 1,
+            1, 3, 4, 3, 1,
+            2, 4, 25, 4, 2, // 中心點給予 25 的超高權重
+            1, 3, 4, 3, 1,
+            1, 1, 2, 1, 1
+        ]),
+
+        // 自定義 9x9：電影級十字光暈 (Cinematic Cross-Flare)
+        // 刻意在水平與垂直方向給予稍微高一點的權重，模擬電影變形鏡頭的星芒溢出
+        '9x9': normalizeKernel([
+            0, 1, 1, 2, 3, 2, 1, 1, 0,
+            1, 1, 2, 3, 5, 3, 2, 1, 1,
+            1, 2, 3, 4, 8, 4, 3, 2, 1,
+            2, 3, 4, 6, 12, 6, 4, 3, 2,
+            3, 5, 8, 12, 80, 12, 8, 5, 3, // 中心點極端權重(80)，確保 9x9 也不會破壞主體清晰度
+            2, 3, 4, 6, 12, 6, 4, 3, 2,
+            1, 2, 3, 4, 8, 4, 3, 2, 1,
+            1, 1, 2, 3, 5, 3, 2, 1, 1,
+            0, 1, 1, 2, 3, 2, 1, 1, 0
+        ])
     };
 
     // 處理圖片上傳
@@ -103,9 +119,8 @@
     });
 
     // 富士色彩調色與顆粒效果 (Color Grading & Grain)
-    // 富士 FXN R 風格調色與顆粒效果
     // 富士風電影片濾鏡 (Fujifilm Cine-look with Split Toning)
-    // 終極版：專業青橘電影感 + 富士底片模擬
+    // 專業青橘電影感 + 富士底片模擬
     function applyFujifilmLook(imageData) {
         const data = imageData.data;
         for (let i = 0; i < data.length; i += 4) {
@@ -123,7 +138,7 @@
 
             // 2. 增加底片對比度 (簡易 S 曲線)
             // 讓暗的地方更暗，亮的地方更亮，畫面才不會灰濛濛
-            let contrast = 1.15; // 1.4 代表增加 40% 對比
+            let contrast = 1.25; // 1.4 代表增加 40% 對比
             rNorm = (rNorm - 0.5) * contrast + 0.5;
             gNorm = (gNorm - 0.5) * contrast + 0.5;
             bNorm = (bNorm - 0.5) * contrast + 0.5;
@@ -139,7 +154,7 @@
             bNorm += 0.22 * shadowWeight; // 大量加藍色
 
             // 👉 亮部染橘金色 (Orange)
-            rNorm += 0.20 * highlightWeight; // 加紅色
+            rNorm += 0.22 * highlightWeight; // 加紅色
             gNorm += 0.06 * highlightWeight; // 加綠色 (紅+綠=橘黃)
             bNorm -= 0.01 * highlightWeight; // 抽離藍色 (去除白光感)
 
